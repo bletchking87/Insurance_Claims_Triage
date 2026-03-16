@@ -8,7 +8,14 @@ st.set_page_config(page_title="51D Claims Triage Demo", page_icon="🔍", layout
 
 # Gemini setup
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-model = genai.GenerativeModel("gemini-2.5-flash")
+model = genai.GenerativeModel(
+    "gemini-2.5-flash",
+    generation_config=genai.GenerationConfig(
+        temperature=0.1,
+        response_mime_type="application/json"   # this forces clean JSON - non-JSON outputs triggered errors.
+    )
+)
+
 
 # ====================== PROMPT (same powerful one) ======================
 SYSTEM_PROMPT = """
@@ -28,11 +35,12 @@ Return ONLY a valid JSON object (no extra text, no markdown, no explanations):
   "reason": "Short 1-2 sentence explanation in the ORIGINAL language of the claim",
   "risk_score": 7,          # 1-10
   "next_steps": "Short actionable next step in ORIGINAL language"
-}
+} 
 
 Be conservative — most real claims should be FLAG_FOR_REVIEW.
 Output ONLY the JSON object.
 """
+# Despite adding "Output ONLY the JSON object" to the prompt, Gemini sometimes adds ```json markdown formatting around the output, so we handle that in the model specification, and in the code below, too.
 
 # ====================== MAIN APP ======================
 st.title("🔍 51D Demo: Multilingual Insurance Claims Triage Agent")
@@ -44,14 +52,15 @@ if st.button("🚀 Triage Claim", type="primary"):
     with st.spinner("Triage in progress..."):
         full_prompt = SYSTEM_PROMPT + "\n\nClaim text:\n" + claim_text
         
+
         response = model.generate_content(
             full_prompt,
             generation_config=genai.GenerationConfig(
                 temperature=0.3,
-                max_output_tokens=500
+                max_output_tokens=500,
+                response_mime_type="application/json"
             )
         )
-        
         raw_text = response.text.strip()
         
         # Clean up if Gemini adds ```json
@@ -109,5 +118,5 @@ Built by Rhys Appleyard """
 # Footer
 st.divider()
 st.markdown("**Live demo for 51D clients** • Multilingual • Agentic workflow • 35% efficiency gain")
-st.caption("Built in 7 days to show exactly the type of AI agent 51D deploys for insurance & financial services firms. Flexible/Returners friendly.")
+st.caption("Built in 7 days to show exactly the type of AI agent 51D deploys for insurance & financial services firms.")
 st.button("📅 Book 15-min demo with me", on_click=lambda: st.markdown("[Add your Calendly link here]"))
