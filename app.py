@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 st.set_page_config(page_title="51D Claims Triage Demo", page_icon="🔍", layout="centered")
 
 # Gemini setup
-genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 model = genai.GenerativeModel("gemini-2.5-flash")
 
 # ====================== PROMPT (same powerful one) ======================
