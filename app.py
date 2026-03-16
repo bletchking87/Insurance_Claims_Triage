@@ -15,8 +15,17 @@ model = genai.GenerativeModel(
         response_mime_type="application/json"   # this forces clean JSON - non-JSON outputs triggered errors.
     )
 )
+#Activating memory as Streamlit's session state to store the uploaded policy text across interactions. This way, when the user uploads a PDF, we can extract the text and keep it available for the triage process without needing to re-upload or re-extract on every button click.
+if "policy_text" not in st.session_state:
+    st.session_state.policy_text = ""
 
-uploaded_file = st.file_uploader("Upload Policy Document (PDF)", type="pdf")
+# 2. Upload and save to memory
+uploaded_file = st.file_uploader("Upload Policy PDF", type="pdf")
+if uploaded_file:
+    reader = pypdf.PdfReader(uploaded_file)
+    # Store it in session_state so it survives the next button click
+    st.session_state.policy_text = "".join([p.extract_text() for p in reader.pages])
+    st.success("Policy stored in memory!")
 
 if uploaded_file:
     # Read the PDF
@@ -58,13 +67,16 @@ st.markdown("**Built in <7 days** | Shows X% efficiency gain for FS/Insurance cl
 claim_text = st.text_area("Paste any claim description (English, French, Spanish, Italian, etc.)", height=150)
 
 if st.button("🚀 Triage Claim", type="primary"):
-    with st.spinner("Triage in progress..."):
-        full_prompt = SYSTEM_PROMPT + "\n\nClaim text:\n" + claim_text
+    if st.session_state.policy_text:
+        # If we have policy text in memory, we can append it to the prompt for more accurate triage.
+        SYSTEM_PROMPT += "\n\nPOLICY DOCUMENT:\n" + st.session_state.policy_text
+        with st.spinner("Triage in progress..."):
+            full_prompt = SYSTEM_PROMPT + "\n\nClaim text:\n" + claim_text
         
 
-        response = model.generate_content(
+            response = model.generate_content(
             full_prompt,
-            generation_config=genai.GenerationConfig(
+                generation_config=genai.GenerationConfig(
                 temperature=0.3,
                 max_output_tokens=500,
                 response_mime_type="application/json"
