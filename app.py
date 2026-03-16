@@ -2,7 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 import json
 import plotly.graph_objects as go
-
+import pypdf
 # ====================== SETUP ======================
 st.set_page_config(page_title="51D Claims Triage Demo", page_icon="🔍", layout="centered")
 
@@ -17,28 +17,27 @@ model = genai.GenerativeModel(
 )
 
 
-# ====================== PROMPT (same powerful one) ======================
+
+# ====================== PROMPT ======================
 SYSTEM_PROMPT = """
-You are an expert insurance claims triage agent for mid-market insurers and financial services firms (like a 51D client).
+You are a Car Insurance Claims Agent. Your job is to triage incoming claims based on the provided POLICY DOCUMENT.
 
-First detect the language of the claim.
-Translate it internally to English for analysis if needed.
-Then classify into exactly one of:
-- APPROVE
-- FLAG_FOR_REVIEW
-- DENY
+PRIMARY RULE: You must triage the claim ONLY based on the provided POLICY DOCUMENT. 
+If the policy is silent on an issue, you must FLAG_FOR_REVIEW and state 'Policy ambiguity detected.'
 
-Return ONLY a valid JSON object (no extra text, no markdown, no explanations):
+EVIDENCE-BASED TRIAGE:
+1. Locate the specific section in the POLICY DOCUMENT that applies to the claim.
+2. If the claim triggers an EXCLUSION listed in the text -> DENY.
+3. If the claim matches an INCLUSION and meets all CONDITIONS -> APPROVE.
+4. If there is a mismatch or missing info -> FLAG_FOR_REVIEW.
+
+Output ONLY JSON:
 {
-  "detected_language": "French",
-  "category": "FLAG_FOR_REVIEW",
-  "reason": "Short 1-2 sentence explanation in the ORIGINAL language of the claim",
-  "risk_score": 7,          # 1-10
-  "next_steps": "Short actionable next step in ORIGINAL language"
-} 
-
-Be conservative — most real claims should be FLAG_FOR_REVIEW.
-Output ONLY the JSON object.
+  "category": "DENY",
+  "policy_reference": "Section 4.2 (Exclusions)",
+  "reason": "Direct quote from policy justifying the decision",
+  "confidence_score": 0.95
+}
 """
 # Despite adding "Output ONLY the JSON object" to the prompt, Gemini sometimes adds ```json markdown formatting around the output, so we handle that in the model specification, and in the code below, too.
 
@@ -46,6 +45,18 @@ Output ONLY the JSON object.
 st.title("🔍 51D Demo: Multilingual Insurance Claims Triage Agent")
 st.markdown("**Built in <7 days** | Shows X% efficiency gain for FS/Insurance clients")
 
+# Upload policy document for RAG. 
+uploaded_file = st.file_uploader("Upload Policy Document (PDF)", type="pdf")
+
+if uploaded_file:
+    # Read the PDF
+    reader = pypdf.PdfReader(uploaded_file)
+    policy_text = ""
+    for page in reader.pages:
+        policy_text += page.extract_text()
+    
+    st.success("Policy loaded successfully!")
+    # Use policy_text as your context for Gemini
 claim_text = st.text_area("Paste any claim description (English, French, Spanish, Italian, etc.)", height=150)
 
 if st.button("🚀 Triage Claim", type="primary"):
