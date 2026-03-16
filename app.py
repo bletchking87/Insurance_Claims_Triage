@@ -16,7 +16,17 @@ model = genai.GenerativeModel(
     )
 )
 
+uploaded_file = st.file_uploader("Upload Policy Document (PDF)", type="pdf")
 
+if uploaded_file:
+    # Read the PDF
+    reader = pypdf.PdfReader(uploaded_file)
+    policy_text = ""
+    for page in reader.pages:
+        policy_text += page.extract_text()
+    
+    st.success("Policy loaded successfully!")
+    # Use policy_text as context for Gemini
 
 # ====================== PROMPT ======================
 SYSTEM_PROMPT = """
@@ -45,18 +55,6 @@ Output ONLY JSON:
 st.title("🔍 51D Demo: Multilingual Insurance Claims Triage Agent")
 st.markdown("**Built in <7 days** | Shows X% efficiency gain for FS/Insurance clients")
 
-# Upload policy document for RAG. 
-uploaded_file = st.file_uploader("Upload Policy Document (PDF)", type="pdf")
-
-if uploaded_file:
-    # Read the PDF
-    reader = pypdf.PdfReader(uploaded_file)
-    policy_text = ""
-    for page in reader.pages:
-        policy_text += page.extract_text()
-    
-    st.success("Policy loaded successfully!")
-    # Use policy_text as your context for Gemini
 claim_text = st.text_area("Paste any claim description (English, French, Spanish, Italian, etc.)", height=150)
 
 if st.button("🚀 Triage Claim", type="primary"):
