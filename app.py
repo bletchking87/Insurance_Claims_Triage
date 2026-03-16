@@ -1,16 +1,16 @@
 import streamlit as st
-from google import genai
+import google.generativeai as genai
 import json
 import plotly.graph_objects as go
-import pandas as pd
 
 # ====================== SETUP ======================
 st.set_page_config(page_title="51D Claims Triage Demo", page_icon="🔍", layout="centered")
 
-# ADDED Gemini key (create .streamlit/secrets.toml with GEMINI_API_KEY = "sk-...")
-genai.api_key = st.secrets["GEMINI_API_KEY"]
+# Gemini setup
+genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+model = genai.GenerativeModel("gemini-2.5-flash")
 
-# ====================== PROMPT ======================
+# ====================== PROMPT (same powerful one) ======================
 SYSTEM_PROMPT = """
 You are an expert insurance claims triage agent for mid-market insurers and financial services firms (like a 51D client).
 
@@ -21,7 +21,7 @@ Then classify into exactly one of:
 - FLAG_FOR_REVIEW
 - DENY
 
-Return ONLY a valid JSON object (no extra text):
+Return ONLY a valid JSON object (no extra text, no markdown, no explanations):
 {
   "detected_language": "French",
   "category": "FLAG_FOR_REVIEW",
@@ -30,28 +30,38 @@ Return ONLY a valid JSON object (no extra text):
   "next_steps": "Short actionable next step in ORIGINAL language"
 }
 
-Be conservative on APPROVE/DENY — most real claims are FLAG_FOR_REVIEW.
+Be conservative — most real claims should be FLAG_FOR_REVIEW.
+Output ONLY the JSON object.
 """
 
 # ====================== MAIN APP ======================
 st.title("🔍 51D Demo: Multilingual Insurance Claims Triage Agent")
-st.markdown("**Built in <7 days** | Oxford Linguistics + Conversation Design Certified | Shows 35%+ efficiency gain for FS/Insurance clients")
+st.markdown("**Built in <7 days** | Shows X% efficiency gain for FS/Insurance clients")
 
 claim_text = st.text_area("Paste any claim description (English, French, Spanish, Italian, etc.)", height=150)
 
 if st.button("🚀 Triage Claim", type="primary"):
     with st.spinner("Triage in progress..."):
-        response = genai.ChatCompletion.create(
-            model="gemini-2.5-flash",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": claim_text}
-            ],
-            temperature=0.3
+        full_prompt = SYSTEM_PROMPT + "\n\nClaim text:\n" + claim_text
+        
+        response = model.generate_content(
+            full_prompt,
+            generation_config=genai.GenerationConfig(
+                temperature=0.3,
+                max_output_tokens=500
+            )
         )
         
+        raw_text = response.text.strip()
+        
+        # Clean up if Gemini adds ```json
+        if raw_text.startswith("```json"):
+            raw_text = raw_text.split("```json")[1].split("```")[0].strip()
+        elif raw_text.startswith("```"):
+            raw_text = raw_text.split("```")[1].strip()
+        
         try:
-            result = json.loads(response.choices[0].message.content.strip())
+            result = json.loads(raw_text)
             
             # Display results
             col1, col2 = st.columns([2, 1])
@@ -74,10 +84,10 @@ if st.button("🚀 Triage Claim", type="primary"):
                            'threshold': {'line': {'color': "black", 'width': 4}, 'value': result['risk_score']}}))
                 st.plotly_chart(fig, use_container_width=True)
             
-            # Simple ROI section
+            # ROI section
             st.subheader("📊 Potential Business Impact")
             daily_claims = st.number_input("Average claims per day in your team?", min_value=1, value=20)
-            hours_saved = daily_claims * 0.35  # 35% faster triage
+            hours_saved = daily_claims * 0.35
             st.metric("Time saved per day", f"{hours_saved:.1f} hours")
             st.metric("Est. annual cost saving", f"£{int(hours_saved * 250 * 35):,}", "at £35/hr avg claims handler")
             
@@ -89,15 +99,15 @@ if st.button("🚀 Triage Claim", type="primary"):
 **Reason:** {result['reason']}
 **Next steps:** {result['next_steps']}
 **ROI:** {hours_saved:.1f} hours/day saved → £{int(hours_saved*250*35):,} annual
-Built by Rhys Appleyard – Oxford Linguistics + AI Trainer Certified"""
+Built by Rhys Appleyard """
             
             st.download_button("📄 Download PDF-style Report", report_md, file_name="51D_Triage_Report.md", mime="text/markdown")
             
-        except:
-            st.error("JSON parse failed — try a clearer claim or refresh.")
+        except Exception as e:
+            st.error(f"Could not parse JSON. Raw output was: {raw_text[:300]}...")
 
 # Footer
 st.divider()
 st.markdown("**Live demo for 51D clients** • Multilingual • Agentic workflow • 35% efficiency gain")
 st.caption("Built in 7 days to show exactly the type of AI agent 51D deploys for insurance & financial services firms. Flexible/Returners friendly.")
-st.button("📅 Book 15-min demo with me", on_click=lambda: st.markdown("[Calendly link here when you add it]"))
+st.button("📅 Book 15-min demo with me", on_click=lambda: st.markdown("[Add your Calendly link here]"))
