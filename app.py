@@ -8,13 +8,7 @@ st.set_page_config(page_title="51D Claims Triage Demo", page_icon="🔍", layout
 
 # Gemini setup
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-model = genai.GenerativeModel(
-    "gemini-2.5-flash",
-    generation_config=genai.GenerationConfig(
-        temperature=0.1,
-        response_mime_type="application/json"   # this forces clean JSON - non-JSON outputs triggered errors.
-    )
-)
+
 #Activating memory as Streamlit's session state to store the uploaded policy text across interactions. This way, when the user uploads a PDF, we can extract the text and keep it available for the triage process without needing to re-upload or re-extract on every button click.
 if "policy_text" not in st.session_state:
     st.session_state.policy_text = ""
@@ -69,7 +63,7 @@ if st.button("🚀 Triage Claim", type="primary"):
             full_prompt,
                 generation_config=genai.GenerationConfig(
                 temperature=0.3,
-                max_output_tokens=500,
+                max_output_tokens=1000,
                 response_mime_type="application/json"
             )
         )
