@@ -26,15 +26,6 @@ if uploaded_file:
     # Store it in session_state so it survives the next button click
     st.session_state.policy_text = "".join([p.extract_text() for p in reader.pages])
     st.success("Policy stored in memory!")
-
-if uploaded_file:
-    # Read the PDF
-    reader = pypdf.PdfReader(uploaded_file)
-    policy_text = ""
-    for page in reader.pages:
-        policy_text += page.extract_text()
-    
-    st.success("Policy loaded successfully!")
     # Use policy_text as context for Gemini
 
 # ====================== PROMPT ======================
